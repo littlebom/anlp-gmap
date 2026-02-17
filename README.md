@@ -94,6 +94,18 @@ curl http://localhost:3000/jobs/{jobId}
 - **Constellation View:** `mockups/mockup_generator.html?job=python_dev`
 - **Focus View:** `mockups/mockup_focus.html`
 
+## Backup & Restore
+
+### Backup
+โปรเจคนี้มีการสำรองข้อมูลไว้ในโฟลเดอร์ `backups/`:
+- **Database Dump:** `backups/db_dump.sql` (สร้างโดย `pg_dump`)
+
+### Restore Database
+หากต้องการ Restore ข้อมูลลงใน Docker:
+```bash
+docker exec -i anlp-postgres psql -U postgres anlp_db < backups/db_dump.sql
+```
+
 ## Tech Stack
 
 | Layer | Technology |
