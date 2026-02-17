@@ -1,0 +1,188 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== Enums =====
+
+enum Role {
+  LEARNER
+  ADMIN
+  CURATOR
+}
+
+enum NodeLevel {
+  L1_CATEGORY
+  L2_JOB_TITLE
+  L3_SKILL
+  L4_SUB_SKILL
+  L5_LEARNING_UNIT
+}
+
+enum ProgressStatus {
+  LOCKED
+  UNLOCKED
+  IN_PROGRESS
+  COMPLETED
+}
+
+// ===== Models =====
+
+/// ผู้ใช้ระบบ
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String   @map("password_hash")
+  role         Role     @default(LEARNER)
+  level        Int      @default(1)
+  xp           Int      @default(0)
+  streakDays   Int      @default(0) @map("streak_days")
+  lastActiveAt DateTime? @map("last_active_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  progress UserProgress[]
+
+  @@map("users")
+}
+
+/// Knowledge Graph Node - 5 ระดับ (L1-L5)
+model SkillNode {
+  id          String    @id @default(uuid())
+  title       String
+  titleTh     String?   @map("title_th")
+  description String?
+  nodeLevel   NodeLevel @map("node_level")
+  cluster     String?
+  sfiaLevel   Int?      @map("sfia_level")
+  icon        String?
+  color       String?
+  tools       Json?
+  source      String?
+  isShared    Boolean   @default(false) @map("is_shared")
+  sharedCount Int       @default(0) @map("shared_count")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Self-referencing hierarchy (L1→L2→L3→L4→L5)
+  parentId String?    @map("parent_id")
+  parent   SkillNode? @relation("NodeHierarchy", fields: [parentId], references: [id])
+  children SkillNode[] @relation("NodeHierarchy")
+
+  // Prerequisite graph (many-to-many)
+  prerequisites SkillNode[] @relation("Prerequisites")
+  requiredBy    SkillNode[] @relation("Prerequisites")
+
+  // Learning content (for L5 nodes)
+  content     String?
+  contentType String?  @map("content_type") // "text", "video", "quiz"
+  duration    Int?     // minutes
+
+  progress UserProgress[]
+
+  @@index([nodeLevel])
+  @@index([parentId])
+  @@map("skill_nodes")
+}
+
+/// ความคืบหน้าของผู้เรียนต่อแต่ละ node
+model UserProgress {
+  id        String         @id @default(uuid())
+  userId    String         @map("user_id")
+  nodeId    String         @map("node_id")
+  status    ProgressStatus @default(LOCKED)
+  score     Float?
+  stars     Int?           // 1-3 stars
+  attempts  Int            @default(0)
+  startedAt DateTime?      @map("started_at")
+  completedAt DateTime?    @map("completed_at")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  node SkillNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, nodeId])
+  @@index([userId])
+  @@index([nodeId])
+  @@map("user_progress")
+}
+
+/// Generated Knowledge Graph (output จาก Generator Service)
+model GeneratedGraph {
+  id         String   @id @default(uuid())
+  jobTitle   String   @map("job_title")
+  status     String   @default("pending") // pending, processing, completed, failed
+  nodeCount  Int      @default(0) @map("node_count")
+  graphData  Json?    @map("graph_data")
+  error      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@map("generated_graphs")
+}
+
+// ===== ESCO Master Data =====
+
+model EscoIscoGroup {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  uri         String           @unique
+  prefLabel   String           @map("pref_label")
+  description String?
+  parentId    String?          @map("parent_id")
+  parent      EscoIscoGroup?   @relation("IscoHierarchy", fields: [parentId], references: [id])
+  children    EscoIscoGroup[]  @relation("IscoHierarchy")
+  occupations EscoOccupation[]
+
+  @@map("esco_isco_groups")
+}
+
+model EscoOccupation {
+  id          String           @id @default(uuid())
+  uri         String           @unique
+  prefLabel   String           @map("pref_label")
+  description String?
+  iscoGroupId String?          @map("isco_group_id")
+  iscoGroup   EscoIscoGroup?   @relation(fields: [iscoGroupId], references: [id])
+  skills      EscoOccupationSkill[]
+
+  @@map("esco_occupations")
+}
+
+model EscoSkill {
+  id          String           @id @default(uuid())
+  uri         String           @unique
+  skillType   String           @map("skill_type")
+  prefLabel   String           @map("pref_label")
+  description String?
+  occupations EscoOccupationSkill[]
+
+  @@map("esco_skills")
+}
+
+enum EscoRelationType {
+  ESSENTIAL
+  OPTIONAL
+}
+
+model EscoOccupationSkill {
+  occupationId String           @map("occupation_id")
+  skillId      String           @map("skill_id")
+  relationType EscoRelationType @map("relation_type")
+
+  occupation   EscoOccupation   @relation(fields: [occupationId], references: [id], onDelete: Cascade)
+  skill        EscoSkill        @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([occupationId, skillId])
+  @@map("esco_occupation_skills")
+}

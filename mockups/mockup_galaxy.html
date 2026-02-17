@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Learn - Galaxy View</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { background: '#0B1120', surface: '#1E293B', primary: '#38bdf8', secondary: '#818cf8', accent: '#2dd4bf' }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background: #0B1120;
+        }
+
+        .bg-grid {
+            background-size: 60px 60px;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-4px);
+            }
+        }
+
+        @keyframes pulseRing {
+
+            0%,
+            100% {
+                opacity: 0.15;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.3;
+                transform: scale(1.03);
+            }
+        }
+
+        @keyframes dashFlow {
+            to {
+                stroke-dashoffset: -16;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes twinkle {
+
+            0%,
+            100% {
+                opacity: 0.3;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+        }
+
+        .node-float {
+            animation: float 5s ease-in-out infinite;
+        }
+
+        .cluster-ring {
+            animation: pulseRing 4s ease-in-out infinite;
+        }
+
+        .edge-line {
+            stroke-dasharray: 6;
+            animation: dashFlow 2s linear infinite;
+        }
+
+        .star-particle {
+            animation: twinkle 3s ease-in-out infinite;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease-out both;
+        }
+
+        #galaxy {
+            cursor: grab;
+            user-select: none;
+        }
+
+        #galaxy:active {
+            cursor: grabbing;
+        }
+
+        #galaxy.fullscreen-active {
+            position: fixed !important;
+            top: 0;
+            left: 0;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999;
+            border-radius: 0 !important;
+        }
+
+        .cluster-label {
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        .job-node {
+            transition: opacity 0.4s, transform 0.4s;
+        }
+
+        .shared-node {
+            transition: opacity 0.4s;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 10px 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+            max-width: 240px;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+
+<body class="text-slate-400 antialiased h-screen flex overflow-hidden">
+
+    <!-- BG effects -->
+    <div class="fixed inset-0 bg-grid pointer-events-none z-0"></div>
+    <div class="fixed top-0 left-1/3 w-[600px] h-[600px] bg-sky-500/5 blur-[120px] rounded-full pointer-events-none">
+    </div>
+    <div
+        class="fixed bottom-0 right-1/4 w-[500px] h-[500px] bg-violet-500/5 blur-[120px] rounded-full pointer-events-none">
+    </div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="w-64 border-r border-slate-800 bg-[#0B1120]/80 backdrop-blur-xl flex flex-col z-30 shrink-0">
+        <div class="h-12 flex items-center px-4 border-b border-slate-800/50">
+            <div
+                class="w-6 h-6 rounded-md bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center mr-2 shadow shadow-sky-500/20">
+                <i data-lucide="orbit" class="w-3.5 h-3.5 text-white"></i>
+            </div>
+            <span class="text-slate-200 font-bold text-sm tracking-tight">AI-Learn Galaxy</span>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto px-3 pt-3 space-y-4">
+            <!-- Search -->
+            <div class="relative">
+                <i data-lucide="search"
+                    class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                <input id="searchInput" type="text" placeholder="ค้นหาอาชีพ..."
+                    class="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/50 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors">
+            </div>
+
+            <!-- Clusters list -->
+            <div>
+                <h3 class="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">Categories (<span
+                        id="catCount">0</span>)</h3>
+                <ul id="categoryList" class="space-y-1"></ul>
+            </div>
+
+            <!-- Stats -->
+            <div class="px-1 space-y-1.5">
+                <h3 class="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Statistics</h3>
+                <div class="flex justify-between text-[11px]"><span class="text-slate-500">Total Jobs</span><span
+                        class="text-slate-200 font-bold" id="statJobs">0</span></div>
+                <div class="flex justify-between text-[11px]"><span class="text-slate-500">Categories</span><span
+                        class="text-slate-200 font-bold" id="statCats">0</span></div>
+                <div class="flex justify-between text-[11px]"><span class="text-slate-500">Shared Skills</span><span
+                        class="text-yellow-400 font-bold" id="statShared">0</span></div>
+                <div class="flex justify-between text-[11px]"><span class="text-slate-500">Total Skills</span><span
+                        class="text-slate-200 font-bold" id="statSkills">0</span></div>
+            </div>
+
+            <!-- Zoom info -->
+            <div class="px-1">
+                <h3 class="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Semantic Zoom</h3>
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2 text-[10px]" id="zoomHint0"><span
+                            class="w-4 h-1 rounded-full bg-primary/40"></span><span class="text-slate-500">≤40%:
+                            Category clusters</span></div>
+                    <div class="flex items-center gap-2 text-[10px]" id="zoomHint1"><span
+                            class="w-4 h-1 rounded-full bg-secondary/40"></span><span class="text-slate-500">40-80%: Job
+                            titles</span></div>
+                    <div class="flex items-center gap-2 text-[10px]" id="zoomHint2"><span
+                            class="w-4 h-1 rounded-full bg-accent/40"></span><span class="text-slate-500">≥80%: Shared
+                            links</span></div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="p-3 border-t border-slate-800/50 text-[10px] text-slate-600 text-center">
+            Scroll to zoom • Drag to pan • Click to explore
+        </div>
+    </aside>
+
+    <!-- ===== MAIN GALAXY ===== -->
+    <main class="flex-1 relative z-10">
+
+        <!-- Top bar -->
+        <div
+            class="absolute top-0 left-0 right-0 h-12 flex items-center justify-between px-5 z-40 bg-gradient-to-b from-[#0B1120] to-transparent pointer-events-none">
+            <div class="pointer-events-auto">
+                <h1 class="text-sm font-bold text-slate-200 tracking-tight">Galaxy View</h1>
+                <p class="text-[10px] text-slate-500" id="breadcrumb">All Categories</p>
+            </div>
+            <div class="flex items-center gap-2 pointer-events-auto">
+                <span
+                    class="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-[10px] text-slate-400 font-mono"
+                    id="zoomDisplay">45%</span>
+                <button onclick="toggleFullscreen()" id="btnFs"
+                    class="w-7 h-7 rounded bg-slate-800/80 border border-slate-700 text-slate-400 flex items-center justify-center hover:bg-slate-700 hover:text-white transition-all"
+                    title="Fullscreen">
+                    <i data-lucide="maximize" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Zoom controls -->
+        <div class="absolute bottom-4 left-4 flex flex-col gap-1 z-40">
+            <button onclick="doZoom(0.08)"
+                class="w-7 h-7 rounded bg-slate-800/90 border border-slate-700 text-slate-300 flex items-center justify-center hover:bg-slate-700 hover:text-white transition-all font-bold text-sm">+</button>
+            <button onclick="doZoom(-0.08)"
+                class="w-7 h-7 rounded bg-slate-800/90 border border-slate-700 text-slate-300 flex items-center justify-center hover:bg-slate-700 hover:text-white transition-all font-bold text-sm">−</button>
+            <button onclick="resetView()"
+                class="w-7 h-7 rounded bg-slate-800/90 border border-slate-700 text-slate-300 flex items-center justify-center hover:bg-slate-700 hover:text-white transition-all"
+                title="Reset">
+                <i data-lucide="scan" class="w-3 h-3"></i>
+            </button>
+        </div>
+
+        <!-- Minimap -->
+        <div
+            class="absolute bottom-4 right-4 w-36 h-24 rounded-lg bg-slate-800/90 border border-slate-700 z-40 overflow-hidden">
+            <canvas id="minimap" width="144" height="96"></canvas>
+        </div>
+
+        <!-- Tooltip -->
+        <div id="tooltip" class="tooltip">
+            <p class="text-xs text-slate-200 font-semibold" id="ttTitle"></p>
+            <p class="text-[10px] text-slate-400 mt-1" id="ttDesc"></p>
+        </div>
+
+        <!-- Galaxy canvas -->
+        <div id="galaxy" class="absolute inset-0 overflow-hidden">
+            <div id="world" class="absolute" style="transform-origin: 0 0;">
+                <svg id="svgLayer" class="absolute pointer-events-none"
+                    style="width:3000px;height:2000px;overflow:visible"></svg>
+                <div id="nodeLayer" class="absolute" style="width:3000px;height:2000px;"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ============================================================
+        //  DATA: 8 Categories, 50+ Jobs, Shared Skills
+        // ============================================================
+        const CATEGORIES = [
+            { id: 'softdev', name: 'Software Development', color: '#38bdf8', icon: 'code', x: 550, y: 350 },
+            { id: 'data', name: 'Data & AI', color: '#a78bfa', icon: 'brain', x: 1000, y: 320 },
+            { id: 'infra', name: 'Infrastructure & Cloud', color: '#34d399', icon: 'cloud', x: 1380, y: 500 },
+            { id: 'security', name: 'Cybersecurity', color: '#f87171', icon: 'shield', x: 1400, y: 900 },
+            { id: 'design', name: 'Design & UX', color: '#fbbf24', icon: 'pen-tool', x: 450, y: 880 },
+            { id: 'pm', name: 'Product & Management', color: '#4ade80', icon: 'clipboard-list', x: 850, y: 1050 },
+            { id: 'qa', name: 'Quality & Testing', color: '#22d3ee', icon: 'test-tubes', x: 1200, y: 1020 },
+            { id: 'acad', name: 'Education & Research', color: '#e879f9', icon: 'graduation-cap', x: 800, y: 650 },
+        ];
+
+        const JOBS = [
+            // Software Dev
+            { id: 'python_dev', name: 'Python Developer', cat: 'softdev', skills: 24 },
+            { id: 'frontend_dev', name: 'Frontend Developer', cat: 'softdev', skills: 26 },
+            { id: 'backend_dev', name: 'Backend Developer', cat: 'softdev', skills: 25 },
+            { id: 'fullstack', name: 'Fullstack Developer', cat: 'softdev', skills: 30 },
+            { id: 'mobile_dev', name: 'Mobile Developer', cat: 'softdev', skills: 22 },
+            { id: 'game_dev', name: 'Game Developer', cat: 'softdev', skills: 20 },
+            { id: 'embedded', name: 'Embedded Engineer', cat: 'softdev', skills: 18 },
+            // Data & AI
+            { id: 'data_sci', name: 'Data Scientist', cat: 'data', skills: 28 },
+            { id: 'ml_eng', name: 'ML Engineer', cat: 'data', skills: 26 },
+            { id: 'data_eng', name: 'Data Engineer', cat: 'data', skills: 24 },
+            { id: 'data_analyst', name: 'Data Analyst', cat: 'data', skills: 18 },
+            { id: 'ai_research', name: 'AI Researcher', cat: 'data', skills: 22 },
+            { id: 'nlp_eng', name: 'NLP Engineer', cat: 'data', skills: 20 },
+            // Infra
+            { id: 'devops', name: 'DevOps Engineer', cat: 'infra', skills: 22 },
+            { id: 'sre', name: 'SRE', cat: 'infra', skills: 20 },
+            { id: 'cloud_arch', name: 'Cloud Architect', cat: 'infra', skills: 24 },
+            { id: 'sys_admin', name: 'System Admin', cat: 'infra', skills: 18 },
+            { id: 'net_eng', name: 'Network Engineer', cat: 'infra', skills: 16 },
+            { id: 'platform', name: 'Platform Engineer', cat: 'infra', skills: 21 },
+            // Security
+            { id: 'sec_analyst', name: 'Security Analyst', cat: 'security', skills: 18 },
+            { id: 'pen_tester', name: 'Penetration Tester', cat: 'security', skills: 20 },
+            { id: 'sec_arch', name: 'Security Architect', cat: 'security', skills: 22 },
+            { id: 'soc_analyst', name: 'SOC Analyst', cat: 'security', skills: 16 },
+            { id: 'forensics', name: 'Digital Forensics', cat: 'security', skills: 15 },
+            // Design
+            { id: 'ui_designer', name: 'UI Designer', cat: 'design', skills: 16 },
+            { id: 'ux_designer', name: 'UX Designer', cat: 'design', skills: 18 },
+            { id: 'ux_research', name: 'UX Researcher', cat: 'design', skills: 14 },
+            { id: 'graphic', name: 'Graphic Designer', cat: 'design', skills: 15 },
+            { id: 'motion', name: 'Motion Designer', cat: 'design', skills: 14 },
+            // PM
+            { id: 'prod_mgr', name: 'Product Manager', cat: 'pm', skills: 15 },
+            { id: 'proj_mgr', name: 'Project Manager', cat: 'pm', skills: 14 },
+            { id: 'scrum_master', name: 'Scrum Master', cat: 'pm', skills: 12 },
+            { id: 'tech_lead', name: 'Tech Lead', cat: 'pm', skills: 20 },
+            { id: 'eng_mgr', name: 'Engineering Manager', cat: 'pm', skills: 18 },
+            // QA
+            { id: 'qa_eng', name: 'QA Engineer', cat: 'qa', skills: 19 },
+            { id: 'qa_auto', name: 'QA Automation', cat: 'qa', skills: 20 },
+            { id: 'perf_eng', name: 'Performance Engineer', cat: 'qa', skills: 17 },
+            { id: 'qa_lead', name: 'QA Lead', cat: 'qa', skills: 16 },
+            // Education
+            { id: 'instructor', name: 'Tech Instructor', cat: 'acad', skills: 14 },
+            { id: 'curriculum', name: 'Curriculum Designer', cat: 'acad', skills: 12 },
+            { id: 'edtech', name: 'EdTech Developer', cat: 'acad', skills: 18 },
+            { id: 'researcher', name: 'CS Researcher', cat: 'acad', skills: 16 },
+        ];
+
+        // Shared skills between CATEGORIES (simplified)
+        const SHARED_LINKS = [
+            { from: 'softdev', to: 'data', shared: 15, top: 'Python, Git, SQL' },
+            { from: 'softdev', to: 'infra', shared: 12, top: 'Linux, Docker, CI/CD' },
+            { from: 'softdev', to: 'qa', shared: 10, top: 'Testing, Git, Automation' },
+            { from: 'softdev', to: 'security', shared: 8, top: 'Auth, Encryption, OWASP' },
+            { from: 'softdev', to: 'design', shared: 6, top: 'HTML/CSS, Prototyping' },
+            { from: 'softdev', to: 'pm', shared: 7, top: 'Agile, Communication' },
+            { from: 'data', to: 'infra', shared: 9, top: 'Python, Cloud, Pipelines' },
+            { from: 'data', to: 'acad', shared: 8, top: 'Statistics, Research, Python' },
+            { from: 'data', to: 'qa', shared: 5, top: 'Automation, Scripting' },
+            { from: 'infra', to: 'security', shared: 11, top: 'Networking, IAM, Monitoring' },
+            { from: 'infra', to: 'qa', shared: 6, top: 'CI/CD, Monitoring, Docker' },
+            { from: 'design', to: 'pm', shared: 7, top: 'User Research, Communication' },
+            { from: 'design', to: 'acad', shared: 4, top: 'Presentation, Pedagogy' },
+            { from: 'pm', to: 'qa', shared: 5, top: 'Agile, Metrics, Reporting' },
+            { from: 'pm', to: 'acad', shared: 4, top: 'Communication, Planning' },
+            { from: 'security', to: 'qa', shared: 4, top: 'Pen Testing, Automation' },
+        ];
+
+        // ============================================================
+        //  LAYOUT
+        // ============================================================
+        const W = 3000, H = 2000;
+        const CLUSTER_R = 180;
+
+        // Position jobs around their cluster center
+        function layoutJobs() {
+            CATEGORIES.forEach(cat => {
+                const jobs = JOBS.filter(j => j.cat === cat.id);
+                jobs.forEach((job, i) => {
+                    const angle = (i / jobs.length) * Math.PI * 2 - Math.PI / 2;
+                    const r = 100 + (i % 2) * 50;
+                    job.x = cat.x + Math.cos(angle) * r;
+                    job.y = cat.y + Math.sin(angle) * r;
+                });
+            });
+        }
+        layoutJobs();
+
+        // ============================================================
+        //  RENDERING
+        // ============================================================
+        let scale = 0.5, panX = -100, panY = -50;
+        const MIN_S = 0.12, MAX_S = 1.5;
+
+        function applyTransform() {
+            const w = document.getElementById('world');
+            w.style.transform = `translate(${panX}px,${panY}px) scale(${scale})`;
+            document.getElementById('zoomDisplay').textContent = Math.round(scale * 100) + '%';
+            updateSemanticVisibility();
+            drawMinimap();
+            updateZoomHints();
+        }
+
+        function updateZoomHints() {
+            const pct = scale * 100;
+            document.getElementById('zoomHint0').querySelector('span:last-child').style.color = pct <= 40 ? '#38bdf8' : '#475569';
+            document.getElementById('zoomHint1').querySelector('span:last-child').style.color = (pct > 40 && pct < 80) ? '#818cf8' : '#475569';
+            document.getElementById('zoomHint2').querySelector('span:last-child').style.color = pct >= 80 ? '#2dd4bf' : '#475569';
+        }
+
+        function updateSemanticVisibility() {
+            const pct = scale * 100;
+            // Cluster labels and rings: always visible, but fade out at very high zoom
+            document.querySelectorAll('.cluster-group').forEach(el => {
+                el.style.opacity = pct > 120 ? '0.3' : '1';
+            });
+            // Job nodes: visible when zoom > 35%
+            document.querySelectorAll('.job-node').forEach(el => {
+                const show = pct > 35;
+                el.style.opacity = show ? '1' : '0';
+                el.style.pointerEvents = show ? 'auto' : 'none';
+            });
+            // Shared links (svg lines): visible when zoom > 25%
+            document.querySelectorAll('.shared-edge').forEach(el => {
+                el.style.opacity = pct > 25 ? Math.min(1, (pct - 25) / 40) : 0;
+            });
+            // Shared badges: visible when zoom > 50%
+            document.querySelectorAll('.shared-badge').forEach(el => {
+                const show = pct > 50;
+                el.style.opacity = show ? '1' : '0';
+            });
+        }
+
+        function renderAll() {
+            renderSVG();
+            renderNodes();
+            renderSidebar();
+            lucide.createIcons();
+            applyTransform();
+        }
+
+        function renderSVG() {
+            const svg = document.getElementById('svgLayer');
+            let html = '';
+
+            // Star particles
+            for (let i = 0; i < 80; i++) {
+                const sx = Math.random() * W, sy = Math.random() * H;
+                const r = 0.5 + Math.random() * 1.5;
+                const d = Math.random() * 5;
+                html += `<circle cx="${sx}" cy="${sy}" r="${r}" fill="#fff" opacity="0.15" class="star-particle" style="animation-delay:${d}s"/>`;
+            }
+
+            // Cluster rings
+            CATEGORIES.forEach(cat => {
+                html += `<circle cx="${cat.x}" cy="${cat.y}" r="${CLUSTER_R}" fill="${cat.color}04" stroke="${cat.color}15" stroke-width="1.5" stroke-dasharray="8" class="cluster-ring"/>`;
+                html += `<circle cx="${cat.x}" cy="${cat.y}" r="${CLUSTER_R * 0.6}" fill="${cat.color}03" stroke="${cat.color}08" stroke-width="1"/>`;
+            });
+
+            // Shared edges between categories
+            SHARED_LINKS.forEach(link => {
+                const a = CATEGORIES.find(c => c.id === link.from);
+                const b = CATEGORIES.find(c => c.id === link.to);
+                const opacity = Math.min(0.35, link.shared / 30);
+                const width = 0.5 + (link.shared / 15);
+                html += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="rgba(250,204,21,${opacity})" stroke-width="${width}" class="edge-line shared-edge" data-from="${link.from}" data-to="${link.to}"/>`;
+                // Shared badge midpoint
+                const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+                html += `<circle cx="${mx}" cy="${my}" r="14" fill="#1e293b" stroke="rgba(250,204,21,0.4)" stroke-width="1" class="shared-badge" style="opacity:0"/>`;
+                html += `<text x="${mx}" y="${my + 4}" text-anchor="middle" fill="#facc15" font-size="9" font-weight="bold" font-family="Inter" class="shared-badge" style="opacity:0">${link.shared}</text>`;
+            });
+
+            svg.innerHTML = html;
+        }
+
+        function renderNodes() {
+            const layer = document.getElementById('nodeLayer');
+            let html = '';
+
+            // Category center labels
+            CATEGORIES.forEach(cat => {
+                const jobCount = JOBS.filter(j => j.cat === cat.id).length;
+                html += `
+        <div class="absolute cluster-group flex flex-col items-center cursor-pointer" style="left:${cat.x - 50}px;top:${cat.y - 50}px;width:100px" 
+             onclick="window.location.href='mockup_category.html?cat=${cat.id}'" onmouseenter="showTooltip(event,'${cat.name}','${jobCount} occupations — Click to explore')" onmouseleave="hideTooltip()">
+            <div class="w-[64px] h-[64px] rounded-full flex items-center justify-center shadow-xl border-2 hover:scale-110 transition-all" 
+                 style="background:linear-gradient(135deg,${cat.color}30,${cat.color}10);border-color:${cat.color}40;box-shadow:0 0 30px ${cat.color}15">
+                <i data-lucide="${cat.icon}" class="w-7 h-7" style="color:${cat.color}"></i>
+            </div>
+            <span class="text-[11px] font-bold mt-2 text-center leading-tight whitespace-nowrap" style="color:${cat.color}">${cat.name}</span>
+            <span class="text-[9px] text-slate-500 mt-0.5">${jobCount} jobs</span>
+        </div>`;
+            });
+
+            // Job nodes (around clusters)
+            JOBS.forEach(job => {
+                const cat = CATEGORIES.find(c => c.id === job.cat);
+                html += `
+        <div class="absolute job-node flex flex-col items-center node-float cursor-pointer" style="left:${job.x - 16}px;top:${job.y - 16}px;opacity:0;animation-delay:${Math.random() * 2}s"
+             onclick="selectJob('${job.id}')" onmouseenter="showTooltip(event,'${job.name}','${job.skills} skills • Category: ${cat.name}')" onmouseleave="hideTooltip()">
+            <div class="w-[32px] h-[32px] rounded-full bg-slate-800/90 border flex items-center justify-center hover:scale-125 transition-all" style="border-color:${cat.color}40" >
+                <div class="w-2.5 h-2.5 rounded-full" style="background:${cat.color}"></div>
+            </div>
+            <span class="text-[7px] text-slate-400 mt-0.5 text-center whitespace-nowrap max-w-[70px] truncate">${job.name}</span>
+        </div>`;
+            });
+
+            layer.innerHTML = html;
+        }
+
+        function renderSidebar() {
+            // Category list
+            const ul = document.getElementById('categoryList');
+            ul.innerHTML = CATEGORIES.map(cat => {
+                const cnt = JOBS.filter(j => j.cat === cat.id).length;
+                return `<li class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer transition-all" onclick="window.location.href='mockup_category.html?cat=${cat.id}'">
+            <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${cat.color}"></span>
+            <span class="text-[11px] text-slate-300 flex-1 truncate">${cat.name}</span>
+            <span class="text-[9px] text-slate-600 font-mono">${cnt}</span>
+        </li>`;
+            }).join('');
+            document.getElementById('catCount').textContent = CATEGORIES.length;
+            document.getElementById('statJobs').textContent = JOBS.length;
+            document.getElementById('statCats').textContent = CATEGORIES.length;
+            document.getElementById('statShared').textContent = SHARED_LINKS.reduce((s, l) => s + l.shared, 0);
+            document.getElementById('statSkills').textContent = JOBS.reduce((s, j) => s + j.skills, 0);
+        }
+
+        // ============================================================
+        //  INTERACTIONS
+        // ============================================================
+
+        // Zoom
+        function doZoom(delta) {
+            scale = Math.max(MIN_S, Math.min(MAX_S, scale + delta));
+            applyTransform();
+        }
+
+        document.getElementById('galaxy').addEventListener('wheel', e => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.04 : 0.04;
+            // Zoom towards cursor
+            const rect = document.getElementById('galaxy').getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const worldX = (mx - panX) / scale;
+            const worldY = (my - panY) / scale;
+            scale = Math.max(MIN_S, Math.min(MAX_S, scale + delta));
+            panX = mx - worldX * scale;
+            panY = my - worldY * scale;
+            applyTransform();
+        }, { passive: false });
+
+        // Pan
+        let dragging = false, dsx, dsy;
+        document.getElementById('galaxy').addEventListener('mousedown', e => {
+            if (e.target.closest('button')) return;
+            dragging = true; dsx = e.clientX - panX; dsy = e.clientY - panY;
+        });
+        window.addEventListener('mousemove', e => {
+            if (!dragging) return;
+            panX = e.clientX - dsx;
+            panY = e.clientY - dsy;
+            applyTransform();
+        });
+        window.addEventListener('mouseup', () => { dragging = false; });
+
+        function resetView() {
+            scale = 0.5; panX = -100; panY = -50;
+            applyTransform();
+            document.getElementById('breadcrumb').textContent = 'All Categories';
+        }
+
+        function focusCluster(catId) {
+            const cat = CATEGORIES.find(c => c.id === catId);
+            if (!cat) return;
+            const el = document.getElementById('galaxy');
+            const gw = el.clientWidth, gh = el.clientHeight;
+            scale = 0.8;
+            panX = gw / 2 - cat.x * scale;
+            panY = gh / 2 - cat.y * scale;
+            applyTransform();
+            document.getElementById('breadcrumb').textContent = `All Categories → ${cat.name}`;
+        }
+
+        function selectJob(jobId) {
+            const job = JOBS.find(j => j.id === jobId);
+            if (!job) return;
+            const cat = CATEGORIES.find(c => c.id === job.cat);
+            const el = document.getElementById('galaxy');
+            const gw = el.clientWidth, gh = el.clientHeight;
+            scale = 1.2;
+            panX = gw / 2 - job.x * scale;
+            panY = gh / 2 - job.y * scale;
+            applyTransform();
+            document.getElementById('breadcrumb').textContent = `All Categories → ${cat.name} → ${job.name}`;
+        }
+
+        // Fullscreen
+        let isFs = false;
+        function toggleFullscreen() {
+            const el = document.getElementById('galaxy');
+            isFs = !isFs;
+            el.classList.toggle('fullscreen-active', isFs);
+            document.getElementById('btnFs').innerHTML = `<i data-lucide="${isFs ? 'minimize' : 'maximize'}" class="w-3.5 h-3.5"></i>`;
+            lucide.createIcons();
+        }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && isFs) toggleFullscreen(); });
+
+        // Tooltip
+        function showTooltip(e, title, desc) {
+            const tt = document.getElementById('tooltip');
+            document.getElementById('ttTitle').textContent = title;
+            document.getElementById('ttDesc').textContent = desc;
+            tt.style.left = (e.clientX + 12) + 'px';
+            tt.style.top = (e.clientY - 10) + 'px';
+            tt.classList.add('visible');
+        }
+        function hideTooltip() { document.getElementById('tooltip').classList.remove('visible'); }
+
+        // Search
+        document.getElementById('searchInput').addEventListener('input', e => {
+            const q = e.target.value.toLowerCase();
+            document.querySelectorAll('.job-node').forEach(el => {
+                const name = el.querySelector('span').textContent.toLowerCase();
+                if (q && name.includes(q)) {
+                    el.style.opacity = '1';
+                    el.querySelector('div').style.boxShadow = '0 0 12px rgba(56,189,248,0.5)';
+                } else if (q) {
+                    el.style.opacity = '0.15';
+                    el.querySelector('div').style.boxShadow = '';
+                } else {
+                    el.querySelector('div').style.boxShadow = '';
+                    updateSemanticVisibility();
+                }
+            });
+        });
+
+        // Minimap
+        function drawMinimap() {
+            const c = document.getElementById('minimap');
+            const ctx = c.getContext('2d');
+            ctx.clearRect(0, 0, 144, 96);
+            const sx = 144 / W, sy = 96 / H;
+
+            CATEGORIES.forEach(cat => {
+                ctx.beginPath();
+                ctx.arc(cat.x * sx, cat.y * sy, 4, 0, Math.PI * 2);
+                ctx.fillStyle = cat.color + '60';
+                ctx.fill();
+            });
+
+            // Viewport
+            const el = document.getElementById('galaxy');
+            const vw = el.clientWidth / scale;
+            const vh = el.clientHeight / scale;
+            const vx = (-panX / scale) * sx;
+            const vy = (-panY / scale) * sy;
+            ctx.strokeStyle = 'rgba(56,189,248,0.5)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(vx, vy, vw * sx, vh * sy);
+        }
+
+        // ============================================================
+        //  INIT
+        // ============================================================
+        window.addEventListener('DOMContentLoaded', renderAll);
+        window.addEventListener('resize', () => { applyTransform(); });
+    </script>
+</body>
+
+</html>

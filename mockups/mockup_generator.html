@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Learn - Constellation View</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { background: '#0B1120', surface: '#1E293B', primary: '#38bdf8', secondary: '#818cf8', accent: '#2dd4bf' }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background: #0B1120;
+        }
+
+        .bg-grid {
+            background-size: 60px 60px;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-4px);
+            }
+        }
+
+        @keyframes pulseRing {
+
+            0%,
+            100% {
+                opacity: 0.2;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.35;
+                transform: scale(1.02);
+            }
+        }
+
+        @keyframes dashFlow {
+            to {
+                stroke-dashoffset: -16;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .node-float {
+            animation: float 5s ease-in-out infinite;
+        }
+
+        .cluster-ring {
+            animation: pulseRing 4s ease-in-out infinite;
+        }
+
+        .edge-line {
+            stroke-dasharray: 6;
+            animation: dashFlow 2s linear infinite;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease-out both;
+        }
+
+        #graph {
+            cursor: grab;
+            user-select: none;
+        }
+
+        #graph:active {
+            cursor: grabbing;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 10px 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+            max-width: 280px;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        .node-active {
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.3), 0 0 20px rgba(56, 189, 248, 0.15);
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        .skill-tag {
+            transition: all 0.2s;
+        }
+
+        .skill-tag:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body class="text-slate-400 antialiased h-screen flex overflow-hidden">
+    <!-- BG -->
+    <div class="fixed inset-0 bg-grid pointer-events-none z-0"></div>
+    <div class="fixed top-0 left-1/3 w-[600px] h-[600px] bg-sky-500/5 blur-[120px] rounded-full pointer-events-none">
+    </div>
+    <div
+        class="fixed bottom-0 right-1/4 w-[500px] h-[500px] bg-violet-500/5 blur-[120px] rounded-full pointer-events-none">
+    </div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="w-64 border-r border-slate-800 bg-[#0B1120]/80 backdrop-blur-xl flex flex-col z-30 shrink-0">
+        <div class="h-12 flex items-center px-4 border-b border-slate-800/50">
+            <div
+                class="w-6 h-6 rounded-md bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center mr-2 shadow shadow-sky-500/20">
+                <i data-lucide="orbit" class="w-3.5 h-3.5 text-white"></i>
+            </div>
+            <span class="text-slate-200 font-bold text-sm tracking-tight">AI-Learn Galaxy</span>
+        </div>
+        <nav class="flex-1 overflow-y-auto px-3 pt-3 space-y-4">
+            <!-- Search -->
+            <div class="relative">
+                <i data-lucide="search"
+                    class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                <input id="searchInput" type="text" placeholder="ค้นหา skill..."
+                    class="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/50 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-primary/50 transition-colors">
+            </div>
+            <!-- Back links -->
+            <div class="space-y-1">
+                <a href="mockup_galaxy.html"
+                    class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-800/30 border border-slate-700/30 text-xs text-slate-400 hover:text-primary hover:border-primary/30 transition-all">
+                    <i data-lucide="globe" class="w-3.5 h-3.5"></i> Galaxy View
+                </a>
+                <a id="backToCat" href="mockup_category.html"
+                    class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-800/30 border border-slate-700/30 text-xs text-slate-400 hover:text-primary hover:border-primary/30 transition-all">
+                    <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> <span id="backToCatLabel">Back to
+                        Category</span>
+                </a>
+            </div>
+            <!-- Skill List -->
+            <div>
+                <h3 class="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">Skills (<span
+                        id="skillCount">0</span>)</h3>
+                <ul id="skillList" class="space-y-0.5 max-h-[300px] overflow-y-auto"></ul>
+            </div>
+            <!-- Job Stats -->
+            <div class="px-1 space-y-1.5">
+                <h3 class="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Job Info</h3>
+                <div class="flex justify-between text-[11px]"><span class="text-slate-500">Node Level</span><span
+                        class="text-primary font-bold">L2</span></div>
+                <div class="flex justify-between text-[11px]"><span class="text-slate-500">Total Skills</span><span
+                        class="text-slate-200 font-bold" id="statTotalSkills">0</span></div>
+                <div class="flex justify-between text-[11px]"><span class="text-slate-500">Sub-Skills</span><span
+                        class="text-secondary font-bold" id="statSubSkills">0</span></div>
+                <div class="flex justify-between text-[11px]"><span class="text-slate-500">Mastered</span><span
+                        class="text-accent font-bold" id="statMastered">0</span></div>
+                <div class="flex justify-between text-[11px]"><span class="text-slate-500">Locked</span><span
+                        class="text-slate-600 font-bold" id="statLocked">0</span></div>
+            </div>
+            <!-- Legend -->
+            <div class="px-1">
+                <h3 class="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Legend</h3>
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2 text-[10px]"><span
+                            class="w-3 h-3 rounded-full bg-gradient-to-br from-sky-500 to-indigo-600 border border-sky-400/40"></span><span
+                            class="text-slate-500">L2: Job Title (root)</span></div>
+                    <div class="flex items-center gap-2 text-[10px]"><span
+                            class="w-3 h-3 rounded-full bg-slate-800 border-2 border-primary/40"></span><span
+                            class="text-slate-500">L3: Skill</span></div>
+                    <div class="flex items-center gap-2 text-[10px]"><span
+                            class="w-3 h-3 rounded-full bg-slate-800 border border-secondary/30"></span><span
+                            class="text-slate-500">L4: Sub-Skill</span></div>
+                    <div class="flex items-center gap-2 text-[10px]"><span
+                            class="w-3 h-3 rounded-full bg-slate-800/50 border border-slate-700/40 opacity-60"></span><span
+                            class="text-slate-500">L5: Locked</span></div>
+                </div>
+            </div>
+        </nav>
+        <div class="p-3 border-t border-slate-800/50 text-[10px] text-slate-600 text-center">
+            Click skill for Focus View • Drag to pan
+        </div>
+    </aside>
+
+    <!-- ===== MAIN ===== -->
+    <main class="flex-1 relative z-10 flex flex-col overflow-hidden">
+        <!-- Top bar -->
+        <div
+            class="h-12 flex items-center justify-between px-5 z-40 border-b border-slate-800/30 bg-[#0B1120]/80 backdrop-blur shrink-0">
+            <div>
+                <div class="flex items-center gap-1.5 text-[10px] text-slate-500">
+                    <a href="mockup_galaxy.html" class="hover:text-primary transition-colors">Galaxy</a>
+                    <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                    <a id="breadCat" href="mockup_category.html"
+                        class="hover:text-primary transition-colors">Category</a>
+                    <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                    <span class="text-primary font-medium" id="breadJob">Job Title</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span
+                    class="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-[10px] text-slate-400 font-mono"
+                    id="zoomDisplay">65%</span>
+            </div>
+        </div>
+
+        <!-- Content: Graph + Inspector -->
+        <div class="flex-1 flex overflow-hidden">
+            <!-- Graph -->
+            <div class="flex-1 relative overflow-hidden" id="graph">
+                <div id="tooltip" class="tooltip">
+                    <p class="text-xs text-slate-200 font-semibold" id="ttTitle"></p>
+                    <p class="text-[10px] text-slate-400 mt-1" id="ttDesc"></p>
+                </div>
+                <div id="world" class="absolute" style="transform-origin: 0 0;">
+                    <svg id="svgLayer" class="absolute pointer-events-none"
+                        style="width:3600px;height:2800px;overflow:visible"></svg>
+                    <div id="nodeLayer" class="absolute" style="width:3600px;height:2800px;"></div>
+                </div>
+                <!-- Zoom controls -->
+                <div class="absolute bottom-4 left-4 flex flex-col gap-1 z-40">
+                    <button onclick="doZoom(0.08)"
+                        class="w-7 h-7 rounded bg-slate-800/90 border border-slate-700 text-slate-300 flex items-center justify-center hover:bg-slate-700 hover:text-white transition-all font-bold text-sm">+</button>
+                    <button onclick="doZoom(-0.08)"
+                        class="w-7 h-7 rounded bg-slate-800/90 border border-slate-700 text-slate-300 flex items-center justify-center hover:bg-slate-700 hover:text-white transition-all font-bold text-sm">−</button>
+                    <button onclick="resetView()"
+                        class="w-7 h-7 rounded bg-slate-800/90 border border-slate-700 text-slate-300 flex items-center justify-center hover:bg-slate-700 hover:text-white transition-all"
+                        title="Reset">
+                        <i data-lucide="scan" class="w-3 h-3"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right: Node Inspector -->
+            <div class="w-80 border-l border-slate-800/30 overflow-y-auto bg-[#0B1120]/40 backdrop-blur shrink-0 flex flex-col"
+                id="inspectorPanel">
+                <!-- Job header -->
+                <div class="px-4 py-4 border-b border-slate-800/20">
+                    <div class="flex items-center gap-3">
+                        <div id="jobIcon"
+                            class="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border-2 shrink-0"
+                            style="background:linear-gradient(135deg,#38bdf830,#38bdf810);border-color:#38bdf840">
+                            <i data-lucide="code" class="w-6 h-6 text-primary"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <h2 class="text-base font-bold text-slate-100 truncate" id="jobTitle">Python Developer</h2>
+                            <p class="text-[10px] text-slate-500" id="jobMeta">Node L2 • SFIA Level 3 • 24 skills</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Selected Skill Inspector -->
+                <div class="px-4 py-3 border-b border-slate-800/20 hidden" id="skillInspector">
+                    <h3 class="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Selected Skill
+                    </h3>
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-primary/10 border border-primary/20 shrink-0"
+                            id="selSkillIcon">
+                            <i data-lucide="code" class="w-5 h-5 text-primary"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-slate-200 truncate" id="selSkillName">Skill Name</p>
+                            <p class="text-[10px] text-slate-500" id="selSkillLevel">L3 • 4 sub-skills</p>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 leading-relaxed mb-2" id="selSkillDesc">Description of the
+                        skill.</p>
+                    <a id="selSkillLink" href="mockup_focus.html"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-[10px] text-primary font-medium hover:bg-primary/20 transition-all">
+                        <i data-lucide="microscope" class="w-3 h-3"></i> Open Focus View
+                    </a>
+                </div>
+                <!-- Progress -->
+                <div class="px-4 py-3 border-b border-slate-800/20">
+                    <h3 class="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Progress</h3>
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <div class="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-primary to-accent rounded-full" id="progressBar"
+                                style="width:35%"></div>
+                        </div>
+                        <span class="text-[10px] text-slate-400 font-mono" id="progressText">35%</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="py-1.5 rounded-lg bg-accent/5 border border-accent/10"><span
+                                class="text-[10px] text-accent font-bold" id="progMastered">3</span><br><span
+                                class="text-[8px] text-slate-600">Mastered</span></div>
+                        <div class="py-1.5 rounded-lg bg-primary/5 border border-primary/10"><span
+                                class="text-[10px] text-primary font-bold" id="progLearning">5</span><br><span
+                                class="text-[8px] text-slate-600">Learning</span></div>
+                        <div class="py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/30"><span
+                                class="text-[10px] text-slate-500 font-bold" id="progLocked">4</span><br><span
+                                class="text-[8px] text-slate-600">Locked</span></div>
+                    </div>
+                </div>
+                <!-- Skill breakdown by SFIA -->
+                <div class="px-4 py-3 flex-1">
+                    <h3 class="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-2">By SFIA Level</h3>
+                    <div class="space-y-1.5" id="sfiaBreakdown"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ============================================================
+        //  DATA
+        // ============================================================
+        const CATEGORIES = [
+            { id: 'softdev', name: 'Software Development', color: '#38bdf8', icon: 'code' },
+            { id: 'data', name: 'Data & AI', color: '#a78bfa', icon: 'brain' },
+            { id: 'infra', name: 'Infrastructure & Cloud', color: '#34d399', icon: 'cloud' },
+            { id: 'security', name: 'Cybersecurity', color: '#f87171', icon: 'shield' },
+            { id: 'design', name: 'Design & UX', color: '#fbbf24', icon: 'pen-tool' },
+            { id: 'pm', name: 'Product & Management', color: '#4ade80', icon: 'clipboard-list' },
+            { id: 'qa', name: 'Quality & Testing', color: '#22d3ee', icon: 'test-tubes' },
+            { id: 'acad', name: 'Education & Research', color: '#e879f9', icon: 'graduation-cap' },
+        ];
+
+        // Full job + skills data
+        const JOB_DATA = {
+            python_dev: {
+                name: 'Python Developer', cat: 'softdev', sfia: 3,
+                skills: [
+                    {
+                        id: 'oop', name: 'OOP', icon: 'diamond', sfia: 2, status: 'mastered',
+                        subSkills: ['Classes', 'Inheritance', 'Polymorphism', 'Encapsulation'],
+                        desc: 'Object-Oriented Programming patterns for structuring code.'
+                    },
+                    {
+                        id: 'data_types', name: 'Data Types', icon: 'type', sfia: 1, status: 'mastered',
+                        subSkills: ['Strings', 'Numbers', 'Collections'],
+                        desc: 'Python built-in data types and their operations.'
+                    },
+                    {
+                        id: 'control_flow', name: 'Control Flow', icon: 'git-branch', sfia: 1, status: 'mastered',
+                        subSkills: ['Conditionals', 'Loops', 'Exception Handling'],
+                        desc: 'Control flow statements and error handling.'
+                    },
+                    {
+                        id: 'functions', name: 'Functions', icon: 'boxes', sfia: 2, status: 'learning',
+                        subSkills: ['Decorators', 'Generators', 'Lambda', 'Closures'],
+                        desc: 'Function design patterns including higher-order functions.'
+                    },
+                    {
+                        id: 'flask', name: 'Flask / FastAPI', icon: 'server', sfia: 3, status: 'learning',
+                        subSkills: ['Routes', 'Middleware', 'REST API', 'Auth'],
+                        desc: 'Web framework for building APIs and web applications.'
+                    },
+                    {
+                        id: 'testing', name: 'Testing', icon: 'test-tubes', sfia: 2, status: 'learning',
+                        subSkills: ['Unit Tests', 'Mocking', 'Integration Tests'],
+                        desc: 'Writing and maintaining automated tests.'
+                    },
+                    {
+                        id: 'sql', name: 'SQL & Databases', icon: 'database', sfia: 2, status: 'learning',
+                        subSkills: ['Queries', 'ORM', 'Migrations', 'Indexing'],
+                        desc: 'Database design, querying, and ORM usage.'
+                    },
+                    {
+                        id: 'git', name: 'Git & VCS', icon: 'git-merge', sfia: 1, status: 'learning',
+                        subSkills: ['Branching', 'Merging', 'PRs'],
+                        desc: 'Version control, branching strategies, and collaboration.'
+                    },
+                    {
+                        id: 'docker', name: 'Docker', icon: 'container', sfia: 3, status: 'locked',
+                        subSkills: ['Dockerfile', 'Compose', 'Networking'],
+                        desc: 'Containerization for reproducible deployments.'
+                    },
+                    {
+                        id: 'async', name: 'Async Programming', icon: 'zap', sfia: 3, status: 'locked',
+                        subSkills: ['asyncio', 'Event Loop', 'Concurrency'],
+                        desc: 'Asynchronous programming patterns with asyncio.'
+                    },
+                    {
+                        id: 'security', name: 'Security Basics', icon: 'shield', sfia: 3, status: 'locked',
+                        subSkills: ['Auth', 'OWASP', 'Encryption'],
+                        desc: 'Application security fundamentals.'
+                    },
+                    {
+                        id: 'deploy', name: 'Deployment', icon: 'rocket', sfia: 4, status: 'locked',
+                        subSkills: ['CI/CD', 'Cloud', 'Monitoring'],
+                        desc: 'Production deployment and monitoring.'
+                    },
+                ],
+                edges: [
+                    ['data_types', 'control_flow'], ['control_flow', 'functions'], ['functions', 'oop'],
+                    ['oop', 'flask'], ['functions', 'testing'], ['flask', 'sql'],
+                    ['sql', 'docker'], ['oop', 'async'], ['flask', 'security'],
+                    ['docker', 'deploy'], ['git', 'testing'], ['testing', 'docker'],
+                ]
+            },
+            frontend_dev: {
+                name: 'Frontend Developer', cat: 'softdev', sfia: 3,
+                skills: [
+                    { id: 'html_css', name: 'HTML & CSS', icon: 'code', sfia: 1, status: 'mastered', subSkills: ['Flexbox', 'Grid', 'Responsive', 'Animations'], desc: 'Web structure and styling fundamentals.' },
+                    { id: 'javascript', name: 'JavaScript', icon: 'file-code', sfia: 1, status: 'mastered', subSkills: ['DOM', 'ES6+', 'Async/Await', 'Closures'], desc: 'Core JavaScript language and browser APIs.' },
+                    { id: 'typescript', name: 'TypeScript', icon: 'file-type', sfia: 2, status: 'mastered', subSkills: ['Types', 'Generics', 'Interfaces', 'Decorators'], desc: 'Typed JavaScript for safer code.' },
+                    { id: 'react', name: 'React', icon: 'atom', sfia: 2, status: 'learning', subSkills: ['Hooks', 'Context', 'Components', 'Router'], desc: 'Component-based UI framework.' },
+                    { id: 'state_mgmt', name: 'State Management', icon: 'layers', sfia: 3, status: 'learning', subSkills: ['Redux', 'Zustand', 'Context API'], desc: 'Managing application state at scale.' },
+                    { id: 'css_fw', name: 'CSS Frameworks', icon: 'palette', sfia: 2, status: 'learning', subSkills: ['Tailwind', 'CSS Modules', 'Styled Components'], desc: 'CSS tooling and framework patterns.' },
+                    { id: 'testing_fe', name: 'Testing', icon: 'test-tubes', sfia: 2, status: 'learning', subSkills: ['Jest', 'RTL', 'Cypress', 'Playwright'], desc: 'Frontend testing strategies.' },
+                    { id: 'build_tools', name: 'Build Tools', icon: 'wrench', sfia: 2, status: 'learning', subSkills: ['Vite', 'Webpack', 'Babel', 'ESLint'], desc: 'Build pipeline and tooling.' },
+                    { id: 'performance', name: 'Performance', icon: 'gauge', sfia: 3, status: 'locked', subSkills: ['Code Splitting', 'Lazy Loading', 'Caching'], desc: 'Web performance optimization.' },
+                    { id: 'a11y', name: 'Accessibility', icon: 'accessibility', sfia: 3, status: 'locked', subSkills: ['ARIA', 'Screen Readers', 'Keyboard Nav'], desc: 'Making web content accessible to all.' },
+                    { id: 'ssr', name: 'SSR / Next.js', icon: 'server', sfia: 3, status: 'locked', subSkills: ['SSR', 'SSG', 'ISR', 'API Routes'], desc: 'Server-side rendering frameworks.' },
+                    { id: 'git_fe', name: 'Git & CI/CD', icon: 'git-merge', sfia: 1, status: 'learning', subSkills: ['Branching', 'PRs', 'Actions'], desc: 'Version control and deployment pipelines.' },
+                ],
+                edges: [
+                    ['html_css', 'javascript'], ['javascript', 'typescript'], ['typescript', 'react'],
+                    ['react', 'state_mgmt'], ['html_css', 'css_fw'], ['react', 'testing_fe'],
+                    ['javascript', 'build_tools'], ['react', 'performance'], ['react', 'a11y'],
+                    ['react', 'ssr'], ['git_fe', 'build_tools'], ['testing_fe', 'performance'],
+                ]
+            },
+            backend_dev: {
+                name: 'Backend Developer', cat: 'softdev', sfia: 3,
+                skills: [
+                    { id: 'python_be', name: 'Python / Node.js', icon: 'code', sfia: 1, status: 'mastered', subSkills: ['Syntax', 'Modules', 'OOP'], desc: 'Backend programming languages.' },
+                    { id: 'django', name: 'Django / Express', icon: 'server', sfia: 2, status: 'mastered', subSkills: ['Models', 'Views', 'Middleware'], desc: 'Backend web frameworks.' },
+                    { id: 'api', name: 'API Design', icon: 'plug', sfia: 2, status: 'learning', subSkills: ['REST', 'GraphQL', 'gRPC', 'Versioning'], desc: 'Designing robust APIs.' },
+                    { id: 'db', name: 'Databases', icon: 'database', sfia: 2, status: 'learning', subSkills: ['PostgreSQL', 'MongoDB', 'Redis', 'ORM'], desc: 'Database systems and data modeling.' },
+                    { id: 'auth_be', name: 'Authentication', icon: 'key', sfia: 3, status: 'learning', subSkills: ['JWT', 'OAuth2', 'RBAC', 'Sessions'], desc: 'Auth patterns and security.' },
+                    { id: 'docker_be', name: 'Docker', icon: 'container', sfia: 3, status: 'learning', subSkills: ['Images', 'Compose', 'Networking'], desc: 'Containerization for deployment.' },
+                    { id: 'testing_be', name: 'Testing', icon: 'test-tubes', sfia: 2, status: 'learning', subSkills: ['Unit', 'Integration', 'Mocking'], desc: 'Backend testing strategies.' },
+                    { id: 'linux', name: 'Linux & CLI', icon: 'terminal', sfia: 2, status: 'learning', subSkills: ['Shell', 'systemd', 'Permissions'], desc: 'Linux server administration.' },
+                    { id: 'cache', name: 'Caching', icon: 'hard-drive', sfia: 3, status: 'locked', subSkills: ['Redis', 'CDN', 'HTTP Cache'], desc: 'Caching strategies for performance.' },
+                    { id: 'mq', name: 'Message Queues', icon: 'mail', sfia: 3, status: 'locked', subSkills: ['RabbitMQ', 'Kafka', 'Bull'], desc: 'Async messaging patterns.' },
+                    { id: 'monitor', name: 'Monitoring', icon: 'activity', sfia: 3, status: 'locked', subSkills: ['Logging', 'Metrics', 'Tracing'], desc: 'Observability and monitoring.' },
+                    { id: 'microservices', name: 'Microservices', icon: 'network', sfia: 4, status: 'locked', subSkills: ['Service Mesh', 'API Gateway', 'Event-Driven'], desc: 'Distributed system architecture.' },
+                ],
+                edges: [
+                    ['python_be', 'django'], ['django', 'api'], ['api', 'db'],
+                    ['db', 'auth_be'], ['django', 'testing_be'], ['docker_be', 'linux'],
+                    ['api', 'cache'], ['db', 'mq'], ['docker_be', 'monitor'],
+                    ['mq', 'microservices'], ['auth_be', 'docker_be'], ['cache', 'monitor'],
+                ]
+            },
+            data_sci: {
+                name: 'Data Scientist', cat: 'data', sfia: 3,
+                skills: [
+                    { id: 'python_ds', name: 'Python', icon: 'code', sfia: 1, status: 'mastered', subSkills: ['NumPy', 'Pandas', 'Scripting'], desc: 'Python for data science.' },
+                    { id: 'statistics', name: 'Statistics', icon: 'bar-chart-3', sfia: 2, status: 'mastered', subSkills: ['Probability', 'Hypothesis Testing', 'Regression'], desc: 'Statistical foundations.' },
+                    { id: 'visualization', name: 'Data Visualization', icon: 'line-chart', sfia: 2, status: 'mastered', subSkills: ['Matplotlib', 'Seaborn', 'Plotly'], desc: 'Creating insightful visualizations.' },
+                    { id: 'ml_basics', name: 'Machine Learning', icon: 'brain', sfia: 3, status: 'learning', subSkills: ['Supervised', 'Unsupervised', 'Evaluation'], desc: 'Core ML algorithms and techniques.' },
+                    { id: 'sql_ds', name: 'SQL', icon: 'database', sfia: 2, status: 'learning', subSkills: ['Queries', 'Joins', 'Window Functions'], desc: 'Data querying and manipulation.' },
+                    { id: 'feature_eng', name: 'Feature Engineering', icon: 'settings', sfia: 3, status: 'learning', subSkills: ['Transformation', 'Selection', 'Encoding'], desc: 'Creating and selecting features.' },
+                    { id: 'deep_learning', name: 'Deep Learning', icon: 'cpu', sfia: 3, status: 'learning', subSkills: ['CNNs', 'RNNs', 'Transformers'], desc: 'Neural networks and deep learning.' },
+                    { id: 'experiment', name: 'Experimentation', icon: 'flask-conical', sfia: 2, status: 'learning', subSkills: ['A/B Testing', 'Metrics', 'Causal Inference'], desc: 'Designing and analyzing experiments.' },
+                    { id: 'big_data', name: 'Big Data', icon: 'hard-drive', sfia: 3, status: 'locked', subSkills: ['Spark', 'Distributed', 'Streaming'], desc: 'Processing large-scale datasets.' },
+                    { id: 'mlops', name: 'MLOps', icon: 'workflow', sfia: 4, status: 'locked', subSkills: ['Pipelines', 'Model Registry', 'Monitoring'], desc: 'Operationalizing ML models.' },
+                    { id: 'domain', name: 'Domain Knowledge', icon: 'lightbulb', sfia: 3, status: 'locked', subSkills: ['Business', 'Communication', 'Storytelling'], desc: 'Applying DS to business problems.' },
+                    { id: 'nlp_ds', name: 'NLP', icon: 'message-square', sfia: 3, status: 'locked', subSkills: ['Text Processing', 'Embeddings', 'LLMs'], desc: 'Natural language processing.' },
+                ],
+                edges: [
+                    ['python_ds', 'statistics'], ['statistics', 'ml_basics'], ['python_ds', 'visualization'],
+                    ['python_ds', 'sql_ds'], ['ml_basics', 'feature_eng'], ['ml_basics', 'deep_learning'],
+                    ['statistics', 'experiment'], ['sql_ds', 'big_data'], ['deep_learning', 'nlp_ds'],
+                    ['feature_eng', 'mlops'], ['ml_basics', 'domain'], ['big_data', 'mlops'],
+                ]
+            },
+            devops: {
+                name: 'DevOps Engineer', cat: 'infra', sfia: 3,
+                skills: [
+                    { id: 'linux_do', name: 'Linux', icon: 'terminal', sfia: 1, status: 'mastered', subSkills: ['Shell', 'Permissions', 'systemd'], desc: 'Linux administration.' },
+                    { id: 'docker_do', name: 'Docker', icon: 'container', sfia: 2, status: 'mastered', subSkills: ['Images', 'Compose', 'Registry'], desc: 'Container management.' },
+                    { id: 'k8s', name: 'Kubernetes', icon: 'ship', sfia: 3, status: 'learning', subSkills: ['Pods', 'Services', 'Helm', 'Operators'], desc: 'Container orchestration.' },
+                    { id: 'cicd', name: 'CI/CD', icon: 'git-merge', sfia: 2, status: 'learning', subSkills: ['GitHub Actions', 'Jenkins', 'ArgoCD'], desc: 'Continuous integration and delivery.' },
+                    { id: 'terraform', name: 'IaC / Terraform', icon: 'file-code', sfia: 3, status: 'learning', subSkills: ['Modules', 'State', 'Providers'], desc: 'Infrastructure as Code.' },
+                    { id: 'cloud_do', name: 'Cloud (AWS/GCP)', icon: 'cloud', sfia: 2, status: 'learning', subSkills: ['EC2/GCE', 'S3', 'IAM', 'VPC'], desc: 'Cloud infrastructure management.' },
+                    { id: 'monitoring_do', name: 'Monitoring', icon: 'activity', sfia: 2, status: 'learning', subSkills: ['Prometheus', 'Grafana', 'Alerting'], desc: 'Infrastructure monitoring.' },
+                    { id: 'networking', name: 'Networking', icon: 'network', sfia: 2, status: 'learning', subSkills: ['DNS', 'Load Balancing', 'VPN'], desc: 'Network fundamentals.' },
+                    { id: 'security_do', name: 'Security', icon: 'shield', sfia: 3, status: 'locked', subSkills: ['Secrets', 'Scanning', 'Compliance'], desc: 'DevSecOps practices.' },
+                    { id: 'gitops', name: 'GitOps', icon: 'git-branch', sfia: 3, status: 'locked', subSkills: ['ArgoCD', 'Flux', 'Declarative'], desc: 'Git-driven operations.' },
+                    { id: 'scripting', name: 'Scripting', icon: 'scroll', sfia: 1, status: 'mastered', subSkills: ['Bash', 'Python', 'Automation'], desc: 'Automation scripting.' },
+                    { id: 'sre_prac', name: 'SRE Practices', icon: 'heart-pulse', sfia: 4, status: 'locked', subSkills: ['SLO/SLI', 'Error Budgets', 'Incident Mgmt'], desc: 'Site reliability engineering.' },
+                ],
+                edges: [
+                    ['linux_do', 'docker_do'], ['docker_do', 'k8s'], ['k8s', 'cicd'],
+                    ['cicd', 'terraform'], ['terraform', 'cloud_do'], ['cloud_do', 'networking'],
+                    ['docker_do', 'monitoring_do'], ['k8s', 'security_do'], ['cicd', 'gitops'],
+                    ['scripting', 'cicd'], ['monitoring_do', 'sre_prac'], ['networking', 'security_do'],
+                ]
+            },
+        };
+
+        // Fallback: generate a generic job for any unspecified job ID
+        function getGenericJob(jobId) {
+            const name = jobId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            return {
+                name, cat: 'softdev', sfia: 2,
+                skills: [
+                    { id: 's1', name: 'Core Concepts', icon: 'book', sfia: 1, status: 'mastered', subSkills: ['Basics', 'Theory'], desc: 'Fundamental concepts.' },
+                    { id: 's2', name: 'Skill 2', icon: 'code', sfia: 2, status: 'learning', subSkills: ['Sub A', 'Sub B'], desc: 'Key skill area.' },
+                    { id: 's3', name: 'Skill 3', icon: 'wrench', sfia: 2, status: 'learning', subSkills: ['Sub C'], desc: 'Applied skill.' },
+                    { id: 's4', name: 'Advanced', icon: 'rocket', sfia: 3, status: 'locked', subSkills: ['Deep', 'Expert'], desc: 'Advanced topics.' },
+                ],
+                edges: [['s1', 's2'], ['s2', 's3'], ['s3', 's4']]
+            };
+        }
+
+        // ============================================================
+        //  READ URL PARAM
+        // ============================================================
+        const urlParams = new URLSearchParams(window.location.search);
+        const jobId = urlParams.get('job') || 'python_dev';
+        const jobData = JOB_DATA[jobId] || getGenericJob(jobId);
+        const catData = CATEGORIES.find(c => c.id === jobData.cat) || CATEGORIES[0];
+
+        // ============================================================
+        //  LAYOUT: radial around center
+        // ============================================================
+        const CX = 1800, CY = 1400;
+
+        function layoutSkills() {
+            const skills = jobData.skills;
+            const count = skills.length;
+
+            // Step 1: Position L3 skills in rings around L2 center
+            skills.forEach((skill, i) => {
+                const ring = skill.status === 'locked' ? 2.2 : (skill.sfia >= 3 ? 1.6 : 1);
+                const r = 280 * ring;
+                const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
+                skill.x = CX + Math.cos(angle) * r;
+                skill.y = CY + Math.sin(angle) * r;
+            });
+
+            // Step 2: Layout L4 sub-skills in an outward-facing fan (arc away from center)
+            const subR = 90;
+            skills.forEach(skill => {
+                const outAngle = Math.atan2(skill.y - CY, skill.x - CX);
+                const n = skill.subSkills.length;
+                const fanSpread = Math.min(Math.PI * 0.8, n * 0.45); // wider fan for more subs
+                skill.subSkillPositions = skill.subSkills.map((sub, si) => {
+                    const t = n === 1 ? 0 : (si / (n - 1) - 0.5); // -0.5 to 0.5
+                    const subAngle = outAngle + t * fanSpread;
+                    return {
+                        name: sub,
+                        x: skill.x + Math.cos(subAngle) * subR,
+                        y: skill.y + Math.sin(subAngle) * subR,
+                    };
+                });
+            });
+
+            // Step 3: Collision resolution — push overlapping L4 nodes apart
+            const allSubs = [];
+            skills.forEach(skill => {
+                if (skill.subSkillPositions) {
+                    skill.subSkillPositions.forEach(sub => allSubs.push(sub));
+                }
+            });
+            const minDist = 48; // minimum distance between L4 centers
+            for (let pass = 0; pass < 12; pass++) {
+                for (let a = 0; a < allSubs.length; a++) {
+                    for (let b = a + 1; b < allSubs.length; b++) {
+                        const dx = allSubs[b].x - allSubs[a].x;
+                        const dy = allSubs[b].y - allSubs[a].y;
+                        const d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < minDist && d > 0) {
+                            const push = (minDist - d) / 2;
+                            const nx = dx / d, ny = dy / d;
+                            allSubs[a].x -= nx * push;
+                            allSubs[a].y -= ny * push;
+                            allSubs[b].x += nx * push;
+                            allSubs[b].y += ny * push;
+                        }
+                    }
+                }
+            }
+        }
+        layoutSkills();
+
+        // ============================================================
+        //  RENDER
+        // ============================================================
+        let scale = 0.38, panX = 0, panY = 0;
+
+        function applyTransform() {
+            const w = document.getElementById('world');
+            const gw = document.getElementById('graph').clientWidth;
+            const gh = document.getElementById('graph').clientHeight;
+            const offsetX = gw / 2 - CX * scale + panX;
+            const offsetY = gh / 2 - CY * scale + panY;
+            w.style.transform = `translate(${offsetX}px,${offsetY}px) scale(${scale})`;
+            document.getElementById('zoomDisplay').textContent = Math.round(scale * 100) + '%';
+        }
+
+        function renderAll() {
+            renderBreadcrumb();
+            renderGraph();
+            renderSidebar();
+            renderInspector();
+            lucide.createIcons();
+            applyTransform();
+        }
+
+        function renderBreadcrumb() {
+            document.title = `AI-Learn - ${jobData.name}`;
+            document.getElementById('breadCat').textContent = catData.name;
+            document.getElementById('breadCat').href = `mockup_category.html?cat=${catData.id}`;
+            document.getElementById('breadJob').textContent = jobData.name;
+            document.getElementById('backToCat').href = `mockup_category.html?cat=${catData.id}`;
+            document.getElementById('backToCatLabel').textContent = catData.name;
+        }
+
+        function renderGraph() {
+            const svg = document.getElementById('svgLayer');
+            const layer = document.getElementById('nodeLayer');
+            let svgH = '', nodeH = '';
+            const skills = jobData.skills;
+
+            // Rings
+            svgH += `<circle cx="${CX}" cy="${CY}" r="280" fill="${catData.color}04" stroke="${catData.color}15" stroke-width="1.5" stroke-dasharray="8" class="cluster-ring"/>`;
+            svgH += `<circle cx="${CX}" cy="${CY}" r="450" fill="${catData.color}02" stroke="${catData.color}08" stroke-width="1" class="cluster-ring"/>`;
+            svgH += `<circle cx="${CX}" cy="${CY}" r="620" fill="${catData.color}01" stroke="${catData.color}05" stroke-width="0.5"/>`;
+
+            // L3-L3 Edges (skill dependency)
+            jobData.edges.forEach(([fromId, toId]) => {
+                const from = skills.find(s => s.id === fromId);
+                const to = skills.find(s => s.id === toId);
+                if (!from || !to) return;
+                const locked = from.status === 'locked' || to.status === 'locked';
+                svgH += `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="${locked ? '#1e293b' : '#334155'}" stroke-width="1" class="edge-line"/>`;
+            });
+
+            // L3→L4 Edges (skill to sub-skills)
+            skills.forEach(skill => {
+                if (!skill.subSkillPositions) return;
+                const isLocked = skill.status === 'locked';
+                skill.subSkillPositions.forEach(sub => {
+                    svgH += `<line x1="${skill.x}" y1="${skill.y}" x2="${sub.x}" y2="${sub.y}" stroke="${isLocked ? 'rgba(30,41,59,0.4)' : 'rgba(99,102,241,0.15)'}" stroke-width="0.8"/>`;
+                });
+            });
+
+            // Center node (L2 Job Title)
+            nodeH += `
+            <div class="absolute flex flex-col items-center" style="left:${CX - 35}px;top:${CY - 35}px">
+                <div class="w-[70px] h-[70px] rounded-full bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-xl border-2 border-sky-400/40 relative" style="box-shadow:0 0 40px ${catData.color}25">
+                    <i data-lucide="${catData.icon}" class="w-8 h-8 text-white"></i>
+                    <span class="absolute -top-1.5 -right-1.5 text-[8px] bg-white text-indigo-700 font-bold px-1.5 py-0.5 rounded-full shadow">L2</span>
+                </div>
+                <span class="text-[11px] text-slate-100 font-bold mt-1.5 whitespace-nowrap">${jobData.name}</span>
+            </div>`;
+
+            // L3 Skill nodes
+            skills.forEach((skill, i) => {
+                const isLocked = skill.status === 'locked';
+                const isMastered = skill.status === 'mastered';
+                const levelLabel = isLocked ? 'L5' : (skill.sfia >= 3 ? 'L4' : 'L3');
+
+                let nodeClass, borderStyle, iconColor, labelColor, badgeStyle;
+                if (isMastered) {
+                    nodeClass = 'bg-slate-800 border-2';
+                    borderStyle = `border-color:${catData.color}60`;
+                    iconColor = catData.color;
+                    labelColor = 'text-slate-200';
+                    badgeStyle = `background:${catData.color}30;color:${catData.color};border:1px solid ${catData.color}30`;
+                } else if (isLocked) {
+                    nodeClass = 'bg-slate-800/50 border opacity-60 cursor-not-allowed';
+                    borderStyle = 'border-color:rgba(51,65,85,0.4)';
+                    iconColor = '#64748b';
+                    labelColor = 'text-slate-500';
+                    badgeStyle = 'background:#334155;color:#64748b';
+                } else {
+                    nodeClass = 'bg-slate-800 border-2';
+                    borderStyle = `border-color:${catData.color}40`;
+                    iconColor = catData.color;
+                    labelColor = 'text-slate-300';
+                    badgeStyle = `background:${catData.color}20;color:${catData.color};border:1px solid ${catData.color}20`;
+                }
+
+                const size = isMastered ? 44 : (isLocked ? 36 : 40);
+                const iconSize = isMastered ? 5 : (isLocked ? 3.5 : 4);
+                const clickAction = isLocked ? '' : `onclick="selectSkill('${skill.id}')"`;
+                const hoverAction = `onmouseenter="showTooltip(event,'${skill.name}','${skill.desc}')" onmouseleave="hideTooltip()"`;
+
+                nodeH += `
+                <div class="absolute skill-node flex flex-col items-center node-float ${isLocked ? '' : 'cursor-pointer'}" 
+                     data-id="${skill.id}" data-name="${skill.name}"
+                     style="left:${skill.x - size / 2}px;top:${skill.y - size / 2}px;animation-delay:${i * 0.12}s"
+                     ${clickAction} ${hoverAction}>
+                    <div class="w-[${size}px] h-[${size}px] rounded-full ${nodeClass} flex items-center justify-center shadow-md ${isLocked ? '' : 'hover:scale-110'} transition-all relative"
+                         style="${borderStyle}">
+                        <i data-lucide="${isLocked ? 'lock' : skill.icon}" class="w-${iconSize} h-${iconSize}" style="color:${iconColor}"></i>
+                        <span class="absolute -top-0.5 -right-0.5 text-[7px] font-bold px-1 py-0.5 rounded-full" style="${badgeStyle}">${levelLabel}</span>
+                    </div>
+                    <span class="text-[9px] ${labelColor} font-medium mt-1 text-center leading-tight max-w-[60px]">${skill.name}</span>
+                    ${isMastered ? `<span class="text-[7px] text-accent mt-0.5">✓ mastered</span>` : ''}
+                </div>`;
+
+                // L4 Sub-skill nodes around this L3
+                if (skill.subSkillPositions) {
+                    skill.subSkillPositions.forEach((sub, si) => {
+                        const subOpacity = isLocked ? 'opacity-30' : 'opacity-70 hover:opacity-100';
+                        const subBorder = isLocked ? 'border-slate-700/30' : `border-[${catData.color}]/20`;
+                        const subColor = isLocked ? 'text-slate-600' : 'text-slate-400';
+                        nodeH += `
+                        <div class="absolute flex flex-col items-center transition-all ${subOpacity}" 
+                             style="left:${sub.x - 17}px;top:${sub.y - 17}px"
+                             onmouseenter="showTooltip(event,'${sub.name}','L4 Sub-skill of ${skill.name}')" onmouseleave="hideTooltip()">
+                            <div class="w-[34px] h-[34px] rounded-full bg-slate-800/80 border flex items-center justify-center ${subBorder} hover:scale-110 transition-all relative shadow-sm">
+                                <div class="w-2.5 h-2.5 rounded-full" style="background:${isLocked ? '#475569' : catData.color + '90'}"></div>
+                                <span class="absolute -top-1 -right-1 text-[6px] font-bold px-1 py-0.5 rounded-full" style="background:${isLocked ? '#1e293b' : catData.color + '20'};color:${isLocked ? '#475569' : catData.color}">L4</span>
+                            </div>
+                            <span class="text-[8px] ${subColor} mt-0.5 text-center leading-tight max-w-[60px]">${sub.name}</span>
+                        </div>`;
+                    });
+                }
+            });
+
+            svg.innerHTML = svgH;
+            layer.innerHTML = nodeH;
+        }
+
+        function renderSidebar() {
+            // Skill list
+            const ul = document.getElementById('skillList');
+            const skills = jobData.skills;
+            ul.innerHTML = skills.map(s => {
+                const statusIcon = s.status === 'mastered' ? '✓' : (s.status === 'locked' ? '🔒' : '📘');
+                const statusColor = s.status === 'mastered' ? 'text-accent' : (s.status === 'locked' ? 'text-slate-600' : 'text-primary');
+                return `<li class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 cursor-pointer text-[10px] transition-all" onclick="selectSkill('${s.id}')">
+                    <span class="${statusColor}">${statusIcon}</span>
+                    <span class="text-slate-300 flex-1 truncate">${s.name}</span>
+                    <span class="text-[8px] text-slate-600 font-mono">L${s.sfia + 1}</span>
+                </li>`;
+            }).join('');
+            document.getElementById('skillCount').textContent = skills.length;
+
+            // Stats
+            document.getElementById('statTotalSkills').textContent = skills.length;
+            document.getElementById('statSubSkills').textContent = skills.reduce((s, sk) => s + sk.subSkills.length, 0);
+            const mastered = skills.filter(s => s.status === 'mastered').length;
+            const locked = skills.filter(s => s.status === 'locked').length;
+            document.getElementById('statMastered').textContent = mastered;
+            document.getElementById('statLocked').textContent = locked;
+
+            // Search
+            document.getElementById('searchInput').addEventListener('input', e => {
+                const q = e.target.value.toLowerCase();
+                document.querySelectorAll('.skill-node').forEach(el => {
+                    const name = (el.dataset.name || '').toLowerCase();
+                    if (q && name.includes(q)) {
+                        el.style.opacity = '1'; el.style.filter = 'drop-shadow(0 0 8px rgba(56,189,248,0.5))';
+                    } else if (q) {
+                        el.style.opacity = '0.15'; el.style.filter = '';
+                    } else {
+                        el.style.opacity = '1'; el.style.filter = '';
+                    }
+                });
+            });
+        }
+
+        function renderInspector() {
+            const skills = jobData.skills;
+            const mastered = skills.filter(s => s.status === 'mastered').length;
+            const learning = skills.filter(s => s.status === 'learning').length;
+            const locked = skills.filter(s => s.status === 'locked').length;
+            const pct = Math.round((mastered / skills.length) * 100);
+
+            // Job header
+            const iconEl = document.getElementById('jobIcon');
+            iconEl.style.background = `linear-gradient(135deg,${catData.color}30,${catData.color}10)`;
+            iconEl.style.borderColor = catData.color + '40';
+            iconEl.innerHTML = `<i data-lucide="${catData.icon}" class="w-6 h-6" style="color:${catData.color}"></i>`;
+            document.getElementById('jobTitle').textContent = jobData.name;
+            document.getElementById('jobMeta').textContent = `Node L2 • SFIA Level ${jobData.sfia} • ${skills.length} skills`;
+
+            // Progress
+            document.getElementById('progressBar').style.width = pct + '%';
+            document.getElementById('progressText').textContent = pct + '%';
+            document.getElementById('progMastered').textContent = mastered;
+            document.getElementById('progLearning').textContent = learning;
+            document.getElementById('progLocked').textContent = locked;
+
+            // SFIA breakdown
+            const sfiaGroups = {};
+            skills.forEach(s => { sfiaGroups[s.sfia] = (sfiaGroups[s.sfia] || 0) + 1; });
+            const sfiaDiv = document.getElementById('sfiaBreakdown');
+            sfiaDiv.innerHTML = Object.keys(sfiaGroups).sort().map(level => {
+                const count = sfiaGroups[level];
+                const pct = Math.round((count / skills.length) * 100);
+                return `<div class="flex items-center gap-2 text-sm">
+                    <span class="text-slate-400 w-12 text-[10px]">SFIA ${level}</span>
+                    <div class="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-primary rounded-full" style="width:${pct}%"></div>
+                    </div>
+                    <span class="text-[10px] text-primary font-mono w-6 text-right">${count}</span>
+                </div>`;
+            }).join('');
+        }
+
+        // ============================================================
+        //  INTERACTIONS
+        // ============================================================
+        function selectSkill(skillId) {
+            const skill = jobData.skills.find(s => s.id === skillId);
+            if (!skill || skill.status === 'locked') return;
+
+            // Show inspector
+            const panel = document.getElementById('skillInspector');
+            panel.classList.remove('hidden');
+            document.getElementById('selSkillName').textContent = skill.name;
+            document.getElementById('selSkillLevel').textContent = `L${skill.sfia <= 1 ? 3 : skill.sfia <= 2 ? 3 : 4} • ${skill.subSkills.length} sub-skills • SFIA ${skill.sfia}`;
+            document.getElementById('selSkillDesc').textContent = skill.desc;
+            document.getElementById('selSkillLink').href = `mockup_focus.html?skill=${skill.id}&job=${jobId}`;
+
+            const iconDiv = document.getElementById('selSkillIcon');
+            iconDiv.style.background = `${catData.color}15`;
+            iconDiv.style.borderColor = `${catData.color}30`;
+            iconDiv.innerHTML = `<i data-lucide="${skill.icon}" class="w-5 h-5" style="color:${catData.color}"></i>`;
+            lucide.createIcons({ nodes: [iconDiv] });
+
+            // Highlight node
+            document.querySelectorAll('.skill-node').forEach(el => {
+                if (el.dataset.id === skillId) {
+                    el.querySelector('div').classList.add('node-active');
+                } else {
+                    el.querySelector('div').classList.remove('node-active');
+                }
+            });
+        }
+
+        // Zoom
+        function doZoom(delta) {
+            scale = Math.max(0.3, Math.min(1.5, scale + delta));
+            applyTransform();
+        }
+
+        document.getElementById('graph').addEventListener('wheel', e => {
+            e.preventDefault();
+            doZoom(e.deltaY > 0 ? -0.04 : 0.04);
+        }, { passive: false });
+
+        function resetView() {
+            scale = 0.38; panX = 0; panY = 0;
+            applyTransform();
+        }
+
+        // Pan
+        let dragging = false, dsx, dsy;
+        document.getElementById('graph').addEventListener('mousedown', e => {
+            if (e.target.closest('a') || e.target.closest('[onclick]')) return;
+            dragging = true; dsx = e.clientX - panX; dsy = e.clientY - panY;
+        });
+        window.addEventListener('mousemove', e => {
+            if (!dragging) return;
+            panX = e.clientX - dsx; panY = e.clientY - dsy;
+            applyTransform();
+        });
+        window.addEventListener('mouseup', () => { dragging = false; });
+
+        // Tooltip
+        function showTooltip(e, title, desc) {
+            const tt = document.getElementById('tooltip');
+            document.getElementById('ttTitle').textContent = title;
+            document.getElementById('ttDesc').textContent = desc;
+            tt.style.left = (e.clientX + 12) + 'px';
+            tt.style.top = (e.clientY - 10) + 'px';
+            tt.classList.add('visible');
+        }
+        function hideTooltip() { document.getElementById('tooltip').classList.remove('visible'); }
+
+        // ============================================================
+        //  INIT
+        // ============================================================
+        window.addEventListener('DOMContentLoaded', renderAll);
+        window.addEventListener('resize', applyTransform);
+    </script>
+</body>
+
+</html>
