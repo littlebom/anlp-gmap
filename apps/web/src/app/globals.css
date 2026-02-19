@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ══════════════════════════════════════════════
+   Galaxy View — Network Constellation Style
+   ══════════════════════════════════════════════ */
+
+.galaxy-bg-grid {
+  background-size: 60px 60px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+/* ── Keyframes ── */
+
+@keyframes galaxy-dash-flow {
+  to { stroke-dashoffset: -16; }
+}
+
+@keyframes galaxy-twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+/* ── Animation classes ── */
+
+.galaxy-edge {
+  stroke-dasharray: 6;
+  animation: galaxy-dash-flow 2s linear infinite;
+}
+
+.galaxy-star {
+  animation: galaxy-twinkle 3s ease-in-out infinite;
+}

@@ -1,0 +1,351 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum UserRole {
+  LEARNER
+  ADMIN
+  CURATOR
+}
+
+enum ProgressStatus {
+  LOCKED
+  UNLOCKED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum CourseCategory {
+  TECHNICAL
+  SOFT
+  TOOL
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CourseRelationType {
+  CORE
+  ELECTIVE
+}
+
+enum ContentType {
+  TEXT
+  VIDEO
+  INTERACTIVE
+}
+
+enum DataSource {
+  ESCO
+  ONET
+  LIGHTCAST
+  AI
+  MANUAL
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  PUBLISHED
+}
+
+enum EscoRelationType {
+  ESSENTIAL
+  OPTIONAL
+}
+
+// ============================================================
+// User
+// ============================================================
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  name           String
+  passwordHash   String
+  role           UserRole  @default(LEARNER)
+  avatarUrl      String?
+  bio            String?
+  totalXp        Int       @default(0)
+  level          Int       @default(1)
+  currentStreak  Int       @default(0)
+  longestStreak  Int       @default(0)
+  lastActiveAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  courseProgress  UserCourseProgress[]
+  lessonProgress UserLessonProgress[]
+
+  @@map("users")
+}
+
+// ============================================================
+// Learning Map: JobGroup → Job ↔ Course → Lesson
+// ============================================================
+
+model JobGroup {
+  id          String   @id @default(uuid())
+  name        String
+  nameTh      String?
+  description String?
+  icon        String?
+  color       String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  jobs        Job[]
+
+  @@map("job_groups")
+}
+
+model Job {
+  id          String      @id @default(uuid())
+  title       String
+  titleTh     String?
+  description String?
+  jobGroupId  String
+  sfiaLevel   Int?
+  icon        String?
+  color       String?
+  source      DataSource  @default(AI)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  jobGroup    JobGroup    @relation(fields: [jobGroupId], references: [id], onDelete: Cascade)
+  courses     JobCourse[]
+
+  @@index([jobGroupId])
+  @@map("jobs")
+}
+
+model Course {
+  id             String         @id @default(uuid())
+  title          String
+  titleTh        String?
+  description    String?
+  category       CourseCategory @default(TECHNICAL)
+  sfiaLevel      Int?
+  estimatedHours Float?
+  isShared       Boolean        @default(false)
+  sharedCount    Int            @default(0)
+  status         CourseStatus   @default(DRAFT)
+  sortOrder      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  jobs           JobCourse[]
+  lessons        Lesson[]
+  // Course dependency (DAG): this course as dependent
+  prerequisites  CourseDependency[] @relation("DependentCourse")
+  // Course dependency (DAG): this course as prerequisite
+  dependents     CourseDependency[] @relation("PrerequisiteCourse")
+  progress       UserCourseProgress[]
+
+  @@map("courses")
+}
+
+model JobCourse {
+  id           String            @id @default(uuid())
+  jobId        String
+  courseId      String
+  relationType CourseRelationType @default(CORE)
+  sortOrder    Int               @default(0)
+
+  job          Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  course       Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, courseId])
+  @@index([jobId])
+  @@index([courseId])
+  @@map("job_courses")
+}
+
+model Lesson {
+  id          String      @id @default(uuid())
+  title       String
+  titleTh     String?
+  description String?
+  courseId     String
+  content     String?
+  contentType ContentType @default(TEXT)
+  duration    Int?        // minutes
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress    UserLessonProgress[]
+
+  @@index([courseId])
+  @@map("lessons")
+}
+
+model CourseDependency {
+  id                   String @id @default(uuid())
+  prerequisiteCourseId String
+  dependentCourseId    String
+
+  prerequisite         Course @relation("PrerequisiteCourse", fields: [prerequisiteCourseId], references: [id], onDelete: Cascade)
+  dependent            Course @relation("DependentCourse", fields: [dependentCourseId], references: [id], onDelete: Cascade)
+
+  @@unique([prerequisiteCourseId, dependentCourseId])
+  @@index([prerequisiteCourseId])
+  @@index([dependentCourseId])
+  @@map("course_dependencies")
+}
+
+// ============================================================
+// User Progress
+// ============================================================
+
+model UserCourseProgress {
+  id          String         @id @default(uuid())
+  userId      String
+  courseId     String
+  status      ProgressStatus @default(LOCKED)
+  score       Float?
+  stars       Int?           // 1-3
+  xpEarned    Int            @default(0)
+  attempts    Int            @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course      Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@map("user_course_progress")
+}
+
+model UserLessonProgress {
+  id          String         @id @default(uuid())
+  userId      String
+  lessonId    String
+  status      ProgressStatus @default(LOCKED)
+  timeSpent   Int            @default(0) // seconds
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+  @@map("user_lesson_progress")
+}
+
+// ============================================================
+// System Settings
+// ============================================================
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+// ============================================================
+// AI Generation
+// ============================================================
+
+model GeneratedMap {
+  id             String    @id @default(uuid())
+  jobTitle       String
+  status         JobStatus @default(PENDING)
+  currentStep    String?
+  mapData        Json?     // IMapResult
+  nodeCount      Int?
+  error          String?
+  publishedJobId String?
+  publishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  @@map("generated_maps")
+}
+
+// ============================================================
+// ESCO Master Data
+// ============================================================
+
+model EscoIscoGroup {
+  id          String          @id @default(uuid())
+  code        String          @unique
+  uri         String
+  prefLabel   String
+  description String?
+  parentId    String?
+
+  parent      EscoIscoGroup?  @relation("IscoGroupHierarchy", fields: [parentId], references: [id])
+  children    EscoIscoGroup[] @relation("IscoGroupHierarchy")
+  occupations EscoOccupation[]
+
+  @@index([parentId])
+  @@map("esco_isco_groups")
+}
+
+model EscoOccupation {
+  id          String                @id @default(uuid())
+  uri         String                @unique
+  prefLabel   String
+  description String?
+  iscoGroupId String?
+
+  iscoGroup   EscoIscoGroup?        @relation(fields: [iscoGroupId], references: [id])
+  skills      EscoOccupationSkill[]
+
+  @@index([iscoGroupId])
+  @@map("esco_occupations")
+}
+
+model EscoSkill {
+  id          String                @id @default(uuid())
+  uri         String                @unique
+  skillType   String
+  prefLabel   String
+  description String?
+
+  occupations EscoOccupationSkill[]
+
+  @@map("esco_skills")
+}
+
+model EscoOccupationSkill {
+  id           String           @id @default(uuid())
+  occupationId String
+  skillId      String
+  relationType EscoRelationType @default(ESSENTIAL)
+
+  occupation   EscoOccupation   @relation(fields: [occupationId], references: [id], onDelete: Cascade)
+  skill        EscoSkill        @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([occupationId, skillId])
+  @@index([occupationId])
+  @@index([skillId])
+  @@map("esco_occupation_skills")
+}

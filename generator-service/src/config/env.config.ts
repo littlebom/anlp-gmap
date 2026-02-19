@@ -20,9 +20,8 @@ const envSchema = z.object({
     ESCO_API_URL: z.string().default('https://ec.europa.eu/esco/api'),
 
     // O*NET
-    ONET_USERNAME: z.string().default(''),
-    ONET_PASSWORD: z.string().default(''),
-    ONET_BASE_URL: z.string().default('https://services.onetcenter.org/ws'),
+    ONET_API_KEY: z.string().default(''),
+    ONET_BASE_URL: z.string().default('https://api-v2.onetcenter.org'),
 
     // Lightcast
     LIGHTCAST_CLIENT_ID: z.string().default(''),

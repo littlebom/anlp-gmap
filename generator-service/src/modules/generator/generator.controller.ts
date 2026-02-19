@@ -36,7 +36,7 @@ export class GeneratorController {
                     success = await escoService.testConnection(); // ESCO usually doesn't need custom keys for the public API we're using
                     break;
                 case 'onet':
-                    success = await onetService.testConnection(credentials?.username, credentials?.password);
+                    success = await onetService.testConnection(credentials?.apiKey);
                     break;
                 case 'lightcast':
                     success = await lightcastService.testConnection(credentials?.clientId, credentials?.clientSecret);

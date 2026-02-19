@@ -5,34 +5,28 @@ import { IONETSearchResult, IONETTool, IONETTechnology, IONETTask } from './onet
 
 export class OnetService {
     private baseUrl: string;
-    private authHeader: string;
+    private apiKey: string;
 
     constructor() {
         this.baseUrl = env.ONET_BASE_URL;
-        const credentials = Buffer.from(`${env.ONET_USERNAME}:${env.ONET_PASSWORD}`).toString('base64');
-        this.authHeader = `Basic ${credentials}`;
+        this.apiKey = env.ONET_API_KEY;
     }
 
-    private get headers() {
+    private getHeaders(apiKey?: string) {
         return {
-            'Authorization': this.authHeader,
+            'X-API-Key': apiKey || this.apiKey,
             'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         };
     }
 
-    async testConnection(username?: string, password?: string): Promise<boolean> {
+    async testConnection(apiKey?: string): Promise<boolean> {
         try {
-            const auth = (username && password)
-                ? `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
-                : this.authHeader;
-
             const url = `${this.baseUrl}/mnm/search`;
             const params = { keyword: 'test', start: 1, end: 1 };
 
             const response = await axios.get(url, {
                 params,
-                headers: { ...this.headers, 'Authorization': auth }
+                headers: this.getHeaders(apiKey),
             });
             return response.status === 200;
         } catch (error) {
@@ -53,14 +47,14 @@ export class OnetService {
             logger.info(`Searching O*NET careers: ${keyword}`);
             // Note: If no credentials are provided, this might return 401 or limited results depending on API config.
             // For now, we assume credentials are set or we handle the error.
-            if (!env.ONET_USERNAME || !env.ONET_PASSWORD) {
-                logger.warn('O*NET Credentials not set. Skipping O*NET search.');
+            if (!env.ONET_API_KEY) {
+                logger.warn('O*NET API key not set. Skipping O*NET search.');
                 return [];
             }
 
             const response = await axios.get(url, {
                 params,
-                headers: this.headers
+                headers: this.getHeaders()
             });
 
             if (response.data.career) {
@@ -81,10 +75,10 @@ export class OnetService {
 
     async getToolsAndTechnology(socCode: string): Promise<{ tools: IONETTool[], technology: IONETTechnology[] }> {
         try {
-            if (!env.ONET_USERNAME) return { tools: [], technology: [] };
+            if (!env.ONET_API_KEY) return { tools: [], technology: [] };
 
             const url = `${this.baseUrl}/mnm/careers/${socCode}/technology`;
-            const response = await axios.get(url, { headers: this.headers });
+            const response = await axios.get(url, { headers: this.getHeaders() });
 
             const tools: IONETTool[] = [];
             const technology: IONETTechnology[] = [];
@@ -116,10 +110,10 @@ export class OnetService {
 
     async getTasks(socCode: string): Promise<IONETTask[]> {
         try {
-            if (!env.ONET_USERNAME) return [];
+            if (!env.ONET_API_KEY) return [];
 
             const url = `${this.baseUrl}/mnm/careers/${socCode}/tasks`;
-            const response = await axios.get(url, { headers: this.headers });
+            const response = await axios.get(url, { headers: this.getHeaders() });
 
             if (response.data.task) {
                 return response.data.task.map((t: any) => ({

@@ -1,0 +1,35 @@
+{
+  "name": "anlp-gmap",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean",
+    "db:generate": "pnpm --filter @anlp/database generate",
+    "db:migrate": "pnpm --filter @anlp/database migrate:dev",
+    "db:push": "pnpm --filter @anlp/database push",
+    "db:seed": "pnpm --filter @anlp/database seed",
+    "db:studio": "pnpm --filter @anlp/database studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "prettier": "^3.5.0"
+  },
+  "packageManager": "pnpm@10.30.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "prisma",
+      "sharp",
+      "msgpackr-extract"
+    ]
+  }
+}

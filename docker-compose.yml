@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: ankane/pgvector:latest
@@ -8,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-anlp_db}
+      POSTGRES_DB: ${DB_NAME:-anlp_gmap}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
@@ -20,7 +18,6 @@ services:
     restart: always
     ports:
       - "${REDIS_PORT:-6379}:6379"
-
 
   pgadmin:
     image: dpage/pgadmin4

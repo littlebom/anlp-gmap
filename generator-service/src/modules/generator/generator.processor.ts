@@ -57,7 +57,7 @@ export class GeneratorProcessor {
 
             // O*NET (Skipped by default due to Auth issues, but left as optional)
             try {
-                if (process.env.ONET_USERNAME) { // Only try if creds exist
+                if (process.env.ONET_API_KEY) { // Only try if API key exists
                     logger.info('Fetching from O*NET...');
                     const onetResults = await onetService.searchCareers(jobTitle);
                     if (onetResults.length > 0) {
@@ -65,7 +65,7 @@ export class GeneratorProcessor {
                         // TODO: Implement O*NET details fetching
                     }
                 } else {
-                    logger.info('Skipping O*NET (No Credentials)');
+                    logger.info('Skipping O*NET (No API Key)');
                 }
             } catch (e) {
                 logger.warn('O*NET Adapter skipped/failed (Non-critical)', e);
